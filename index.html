@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pīwakawaka's Logistics Journey</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Nunito', sans-serif; background-color: #ECFDF5; overflow: hidden; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+        
+        /* Animations */
+        .animate-float { animation: float 3s ease-in-out infinite; transform-origin: bottom center; }
+        @keyframes float { 0% { transform: translateY(0px) scale(1); } 50% { transform: translateY(-15px) scale(1.05); } 100% { transform: translateY(0px) scale(1); } }
+        .animate-bounce-fast { animation: bounce-fast 0.6s infinite; }
+        @keyframes bounce-fast { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+        
+        /* Tactile Buttons */
+        .game-btn { box-shadow: 0 6px 0px rgba(0,0,0,0.15); transition: all 0.1s; }
+        .game-btn:active:not(:disabled) { transform: translateY(6px) !important; box-shadow: 0 0px 0px rgba(0,0,0,0.15) !important; }
+        .level-locked { filter: grayscale(100%) opacity(0.6); pointer-events: none; }
+        
+        .error-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake { 10%, 90% { transform: translate3d(-2px, 0, 0); } 20%, 80% { transform: translate3d(4px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-8px, 0, 0); } 40%, 60% { transform: translate3d(8px, 0, 0); } }
+        
+        /* Layout Transitions */
+        .screen-container { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.6s ease-in-out; }
+        .slide-in-right { transform: translateX(0%); opacity: 1; pointer-events: auto; }
+        .slide-out-left { transform: translateX(-100%); opacity: 0; pointer-events: none; }
+        .slide-out-right { transform: translateX(100%); opacity: 0; pointer-events: none; }
+        
+        /* Confetti Particles */
+        .particle { position: absolute; pointer-events: none; animation: pop 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards; z-index: 100; }
+        @keyframes pop { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(var(--tx), var(--ty)) scale(1.5) rotate(var(--rot)); opacity: 0; } }
+        
+        /* Stars */
+        .star-filled { filter: grayscale(0%) opacity(1); transform: scale(1.1); transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .star-empty { filter: grayscale(100%) opacity(0.3); transform: scale(0.9); transition: all 0.3s; }
+        
+        /* Mobile Scroll Fixes */
+        .scroll-area { 
+            -webkit-overflow-scrolling: touch; 
+            overscroll-behavior-y: contain; 
+            touch-action: pan-y !important;
+        }
+
+        /* Scrollbar */
+        .scroll-area::-webkit-scrollbar { width: 8px; }
+        .scroll-area::-webkit-scrollbar-track { background: rgba(255,255,255,0.3); border-radius: 8px; }
+        .scroll-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.9); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+        
+        /* TTS Emerald Glow */
+        .tts-active { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.4); border-color: #10B981 !important; transform: scale(1.02); transition: all 0.3s ease-in-out; }
+        
+        /* Speech Bubble */
+        .speech-bubble { position: relative; }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); border-width: 20px 20px 0; border-style: solid; border-color: white transparent transparent transparent; display: block; width: 0; z-index: 1; }
+        .speech-bubble::before { content: ''; position: absolute; bottom: -26px; left: 50%; transform: translateX(-50%); border-width: 24px 24px 0; border-style: solid; border-color: #e5e7eb transparent transparent transparent; display: block; width: 0; z-index: 0; }
+        
+        /* Background Animations */
+        .cloud { position: absolute; opacity: 0.8; animation: drift linear infinite; pointer-events: none; z-index: 0; }
+        @keyframes drift { from { transform: translateX(-20vw); } to { transform: translateX(120vw); } }
+        
+        .sun { position: absolute; top: 10%; right: 15%; width: 100px; height: 100px; background: #FDE047; border-radius: 50%; box-shadow: 0 0 40px #FEF08A; animation: pulse-sun 4s infinite alternate; pointer-events: none; z-index: 0; }
+        @keyframes pulse-sun { 0% { transform: scale(1); box-shadow: 0 0 40px #FEF08A; } 100% { transform: scale(1.1); box-shadow: 0 0 60px #FDE047; } }
+        
+        .tree-sway { display: inline-block; animation: sway 4s ease-in-out infinite alternate; transform-origin: bottom center; }
+        @keyframes sway { 0% { transform: rotate(-3deg); } 100% { transform: rotate(3deg); } }
+        
+        /* Mobile Scaling Overrides */
+        #level-visual div { font-size: 4rem !important; line-height: 1 !important; }
+        @media (min-width: 640px) { #level-visual div { font-size: 6rem !important; } }
+    </style>
+</head>
+<body class="w-screen h-[100dvh] relative flex items-center justify-center bg-gradient-to-b from-sky-200 via-emerald-100 to-emerald-50 overflow-hidden text-gray-800">
+
+    <!-- Native Forest Background -->
+    <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        <div class="sun"></div>
+        <div class="cloud text-6xl" style="top: 15%; animation-duration: 40s; font-size: 8rem;">☁️</div>
+        <div class="cloud text-5xl" style="top: 35%; animation-duration: 55s; animation-delay: -20s; font-size: 6rem;">☁️</div>
+        <div class="cloud text-7xl" style="top: 5%; animation-duration: 35s; animation-delay: -10s; font-size: 10rem;">☁️</div>
+        <div class="absolute bottom-0 w-full h-1/3 bg-gradient-to-t from-emerald-200 to-transparent opacity-50"></div>
+        <div class="absolute bottom-10 left-10 text-8xl tree-sway opacity-60">🌲</div>
+        <div class="absolute bottom-5 right-20 text-9xl tree-sway opacity-60" style="animation-delay: -2s;">🌳</div>
+    </div>
+
+    <!-- Animal SVGs -->
+    <template id="svg-piwakawaka"><svg viewBox="0 0 100 100" class="w-32 h-32 sm:w-48 sm:h-48 drop-shadow-2xl"><path d="M40,55 C40,40 50,30 65,30 C75,30 80,40 75,55 C70,70 50,75 40,55 Z" fill="#8B5A2B"/><path d="M60,35 C70,35 75,45 70,55 Z" fill="#4A3020"/><ellipse cx="55" cy="50" rx="15" ry="10" fill="#E6DCC8"/><path d="M75,45 L85,42 L78,50 Z" fill="#333"/><circle cx="65" cy="40" r="3" fill="#000"/><circle cx="66" cy="39" r="1" fill="#fff"/><path d="M45,55 C20,40 10,60 15,80 C30,70 45,75 55,65 Z" fill="#A08060"/><path d="M15,80 C25,85 45,85 55,75" fill="none" stroke="#fff" stroke-width="2"/><path d="M50,70 L45,85 M55,70 L55,85" stroke="#333" stroke-width="2"/></svg></template>
+    <template id="svg-kekeno"><svg viewBox="0 0 100 100" class="w-32 h-32 sm:w-48 sm:h-48 drop-shadow-2xl"><path d="M10,85 C30,95 70,95 80,70 C90,40 75,20 60,25 C50,28 45,45 35,55 C20,70 10,70 10,85 Z" fill="#4a4441"/><path d="M40,70 C50,85 70,80 60,65 Z" fill="#302c2a"/><circle cx="65" cy="35" r="3" fill="#000"/><circle cx="80" cy="32" r="4" fill="#1a1a1a"/><path d="M82,35 L95,40 M82,38 L93,45" stroke="#000" stroke-width="1.5" stroke-linecap="round"/></svg></template>
+    <template id="svg-kiwi"><svg viewBox="0 0 100 100" class="w-32 h-32 sm:w-48 sm:h-48 drop-shadow-2xl"><path d="M40,75 L40,90 M35,90 L45,90 M60,75 L60,90 M55,90 L65,90" stroke="#d97736" stroke-width="4" stroke-linecap="round"/><ellipse cx="50" cy="55" rx="35" ry="25" fill="#5c4033"/><circle cx="25" cy="45" r="15" fill="#5c4033"/><path d="M12,50 Q5,65 2,80" stroke="#e8c39e" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="20" cy="42" r="2.5" fill="#000"/></svg></template>
+    <template id="svg-huntaway"><svg viewBox="0 0 100 100" class="w-32 h-32 sm:w-48 sm:h-48 drop-shadow-2xl"><path d="M30,90 L30,50 C30,30 50,30 60,35 C75,40 85,50 85,70 L85,90 Z" fill="#111111"/><path d="M60,65 C75,65 85,75 85,90 L60,90 Z" fill="#c47029"/><circle cx="55" cy="40" r="4" fill="#c47029"/><path d="M75,55 C85,55 85,65 85,70 C75,70 70,65 75,55 Z" fill="#c47029"/><path d="M35,35 C25,45 25,60 35,55 Z" fill="#111111"/><circle cx="85" cy="55" r="3" fill="#000"/><circle cx="65" cy="45" r="2.5" fill="#fff"/><circle cx="66" cy="45" r="1.5" fill="#000"/></svg></template>
+    <template id="svg-kea"><svg viewBox="0 0 100 100" class="w-32 h-32 sm:w-48 sm:h-48 drop-shadow-2xl"><path d="M40,80 L40,90 M55,80 L55,90" stroke="#333" stroke-width="4" stroke-linecap="round"/><path d="M20,60 L5,85 L25,75 Z" fill="#4d5e3c"/><ellipse cx="45" cy="55" rx="25" ry="30" fill="#5e6b45"/><path d="M35,45 C50,45 65,70 45,80 Z" fill="#5e6b45"/><path d="M40,55 C55,55 60,70 45,75 Z" fill="#d95e16"/><circle cx="60" cy="35" r="18" fill="#5e6b45"/><path d="M75,30 C90,30 90,50 80,55 C85,45 80,40 75,40 Z" fill="#4a4a4a"/><circle cx="65" cy="32" r="2.5" fill="#000"/><circle cx="55" cy="40" r="4" fill="#d95e16" opacity="0.6"/></svg></template>
+    <template id="svg-whio"><svg viewBox="0 0 100 100" class="w-32 h-32 sm:w-48 sm:h-48 drop-shadow-2xl"><ellipse cx="50" cy="60" rx="35" ry="25" fill="#5A6B7C"/><circle cx="75" cy="40" r="15" fill="#5A6B7C"/><path d="M70,55 Q80,80 40,85 Z" fill="#8B4513"/><path d="M85,35 Q98,40 88,45 Z" fill="#E6DCC8"/><circle cx="78" cy="35" r="2.5" fill="#000"/></svg></template>
+    <template id="svg-tui"><svg viewBox="0 0 100 100" class="w-32 h-32 sm:w-48 sm:h-48 drop-shadow-2xl"><path d="M30,80 Q50,90 65,70 Q75,40 60,30 Q40,30 30,50 Z" fill="#1A2B3C"/><circle cx="55" cy="60" r="6" fill="#FFF" filter="drop-shadow(0 2px 2px rgba(0,0,0,0.3))"/><circle cx="65" cy="35" r="2" fill="#000"/><path d="M68,32 Q85,35 68,40 Z" fill="#111"/></svg></template>
+    <template id="svg-ruru"><svg viewBox="0 0 100 100" class="w-32 h-32 sm:w-48 sm:h-48 drop-shadow-2xl"><ellipse cx="50" cy="65" rx="30" ry="25" fill="#5C4033"/><circle cx="50" cy="35" r="22" fill="#4A3020"/><circle cx="40" cy="35" r="8" fill="#F4C430"/><circle cx="60" cy="35" r="8" fill="#F4C430"/><circle cx="40" cy="35" r="3" fill="#000"/><circle cx="60" cy="35" r="3" fill="#000"/><path d="M45,45 L55,45 L50,55 Z" fill="#111"/></svg></template>
+    <template id="svg-takahe"><svg viewBox="0 0 100 100" class="w-32 h-32 sm:w-48 sm:h-48 drop-shadow-2xl"><ellipse cx="45" cy="60" rx="35" ry="30" fill="#204070"/><ellipse cx="70" cy="40" rx="15" ry="18" fill="#204070"/><path d="M80,30 Q95,45 80,55 Z" fill="#C03030"/><circle cx="75" cy="35" r="2.5" fill="#000"/><path d="M35,80 L35,95 M55,80 L55,95" stroke="#C03030" stroke-width="4"/></svg></template>
+    <template id="svg-kakapo"><svg viewBox="0 0 100 100" class="w-32 h-32 sm:w-48 sm:h-48 drop-shadow-2xl"><ellipse cx="50" cy="55" rx="35" ry="40" fill="#557B3E"/><circle cx="50" cy="35" r="20" fill="#759A4E"/><path d="M45,40 L55,40 L50,50 Z" fill="#B0A080"/><circle cx="42" cy="32" r="2" fill="#000"/><circle cx="58" cy="32" r="2" fill="#000"/><path d="M15,55 Q5,70 15,85" stroke="#446130" stroke-width="3" fill="none"/></svg></template>
+    <template id="svg-weka"><svg viewBox="0 0 100 100" class="w-32 h-32 sm:w-48 sm:h-48 drop-shadow-2xl"><ellipse cx="45" cy="65" rx="35" ry="25" fill="#8B5A2B"/><circle cx="75" cy="45" r="15" fill="#8B5A2B"/><path d="M85,40 L98,45 L85,50 Z" fill="#A08060"/><circle cx="78" cy="42" r="2" fill="#000"/><path d="M35,85 L35,95 M55,85 L55,95" stroke="#A08060" stroke-width="3"/></svg></template>
+
+    <!-- Mobile-Optimized Top Controls -->
+    <div class="absolute top-2 sm:top-4 right-2 sm:right-4 z-[60] flex gap-2 sm:gap-4">
+        <button id="btn-educator" class="game-btn bg-blue-400 hover:bg-blue-300 text-white rounded-full w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center text-lg sm:text-2xl border-2 sm:border-4 border-white shadow-lg" title="Educator Notes">📖</button>
+        <button id="btn-music" class="game-btn bg-emerald-400 hover:bg-emerald-300 text-white rounded-full w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center text-lg sm:text-2xl border-2 sm:border-4 border-white">🎵</button>
+        <button id="btn-speech" class="game-btn bg-teal-400 hover:bg-teal-300 text-white rounded-full w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center text-lg sm:text-2xl border-2 sm:border-4 border-white shadow-lg">🔊</button>
+    </div>
+
+    <!-- MAIN HUB SCREEN -->
+    <div id="screen-hub" class="screen-container slide-in-right absolute inset-0 flex flex-col items-center pt-16 sm:pt-10 pb-4 z-20">
+        <div class="bg-white/90 p-6 rounded-3xl shadow-xl border-4 border-white mb-6 text-center max-w-2xl mx-4 z-10 shrink-0 mt-4 sm:mt-0">
+            <h1 class="text-3xl sm:text-5xl font-black text-emerald-600 mb-2 drop-shadow-sm" style="-webkit-text-stroke: 1px white;">Pīwakawaka's Logistics Journey</h1>
+            <p class="text-gray-600 text-lg sm:text-2xl font-bold" id="hub-instruction">Kia ora! Let's explore the amazing world of Logistics and Supply Chains!</p>
+        </div>
+        <div id="map-nodes" class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 relative z-10 w-full max-w-3xl px-4 overflow-y-auto scroll-area flex-1 min-h-0 pb-24 sm:pb-8"></div>
+    </div>
+
+    <!-- LEVEL PLAY SCREEN -->
+    <div id="screen-level" class="screen-container slide-out-right absolute inset-0 flex flex-col z-10 pt-16 sm:pt-20">
+        <div class="absolute top-2 sm:top-4 left-2 sm:left-4 z-50 flex items-center gap-2 sm:gap-4">
+            <button id="btn-back" class="game-btn bg-rose-400 hover:bg-rose-300 text-white rounded-full px-3 py-1 sm:px-6 sm:py-3 font-black text-sm sm:text-xl border-2 sm:border-4 border-white whitespace-nowrap">⬅️ Map</button>
+            <div id="level-progress" class="bg-white/90 rounded-full px-2 sm:px-4 py-1 sm:py-2 flex items-center gap-0.5 sm:gap-1 shadow-md border-2 border-white min-h-[32px] sm:min-h-[44px]"></div>
+        </div>
+
+        <div class="relative flex-1 min-h-0 flex flex-col items-center justify-start p-4 sm:p-8 overflow-y-auto scroll-area overflow-x-hidden z-10 w-full" id="level-playarea">
+            <div class="flex flex-col items-center justify-center w-full relative shrink-0">
+                <div id="instruction-box" class="speech-bubble bg-white p-4 sm:p-6 rounded-3xl shadow-lg border-4 border-gray-200 text-center max-w-2xl w-full mb-6 sm:mb-8 transition-all duration-300 z-20">
+                    <p id="level-instruction" class="text-lg sm:text-3xl font-bold text-gray-800"></p>
+                </div>
+                <div id="level-character" class="mb-2 z-10 transform scale-75 sm:scale-100 origin-bottom"></div>
+                <div id="level-visual" class="bg-white/90 p-4 sm:p-6 rounded-3xl shadow-md border-4 border-white font-black text-gray-800 text-center tracking-widest flex items-center justify-center w-full max-w-lg mb-6 sm:mb-8 transition-transform duration-200"></div>
+            </div>
+            <div id="level-options" class="flex flex-col sm:flex-row flex-wrap justify-center items-center gap-3 sm:gap-4 w-full shrink-0 mt-auto"></div>
+            <!-- Explicit physical spacer to guarantee mobile scrolling clears the bottom address bar/screen edge -->
+            <div class="w-full h-32 sm:h-16 shrink-0 pointer-events-none"></div>
+        </div>
+        
+        <div id="loading-overlay" class="absolute inset-0 bg-white/60 backdrop-blur-md z-[55] hidden flex-col items-center justify-center transition-opacity duration-300 opacity-0 pointer-events-none">
+            <div class="text-6xl animate-spin mb-4">📦</div>
+            <h3 class="text-3xl font-black text-emerald-600 bg-white/90 px-6 py-2 rounded-full shadow-lg border-4 border-emerald-200">Loading next question...</h3>
+        </div>
+    </div>
+
+    <!-- SUCCESS MODAL -->
+    <div id="modal-success" class="absolute inset-0 bg-black/40 flex items-center justify-center z-[70] hidden backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl border-8 border-emerald-400 text-center max-w-sm mx-4 transform transition-transform scale-90" id="success-box">
+            <div class="text-7xl mb-4 animate-bounce">🌟</div>
+            <h2 class="text-3xl font-black text-emerald-500 mb-4" id="success-title">Ka pai! You are super smart!</h2>
+            <p class="text-xl font-bold text-gray-700 mb-8" id="success-msg">Great job finishing the level!</p>
+            <button id="btn-next" class="game-btn bg-emerald-500 hover:bg-emerald-400 text-white font-black text-2xl py-4 px-8 rounded-full border-4 border-white w-full">Next Lesson!</button>
+        </div>
+    </div>
+
+    <!-- FINALE MODAL -->
+    <div id="modal-finale" class="absolute inset-0 bg-black/40 flex items-center justify-center z-[70] hidden backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl border-8 border-yellow-400 text-center max-w-md mx-4 transform transition-transform scale-90" id="finale-box">
+            <div class="text-8xl mb-4 animate-bounce">🎊🏆🎊</div>
+            <h2 class="text-4xl font-black text-amber-500 mb-4">Tino Pai Rawa Atu!</h2>
+            <p class="text-xl font-bold text-gray-700 mb-8">You completed the entire Logistics Journey! You are a superstar supply chain master!</p>
+            <button id="btn-restart" class="game-btn bg-amber-500 hover:bg-amber-400 text-white font-black text-2xl py-4 px-8 rounded-full border-4 border-white w-full">Play Again</button>
+        </div>
+    </div>
+
+    <!-- EDUCATOR MODAL -->
+    <div id="modal-educator" class="absolute inset-0 bg-black/40 flex items-center justify-center z-[80] hidden backdrop-blur-sm">
+        <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl border-8 border-blue-400 max-w-2xl mx-4 transform transition-transform scale-90 max-h-[90vh] overflow-y-auto" id="educator-box">
+            <h2 class="text-3xl font-black text-blue-600 mb-4 text-center">Educator Notes: Logistics & Pedagogy</h2>
+            <div class="text-gray-700 space-y-4 mb-6 text-sm sm:text-base font-bold">
+                <p>This application integrates the <strong>Top 50 Logistics Concepts</strong> as defined by the developmental needs of the world's leading economies.</p>
+                <p>Designed for 5-to-6-year-olds, it utilizes <strong>Cognitive Load Theory (CLT)</strong> by John Sweller to make advanced concepts accessible:</p>
+                <ul class="list-disc pl-6 space-y-2">
+                    <li><strong>Minimizing Extraneous Load:</strong> Interfaces are stripped of unnecessary text. The scrolling layout is enforced via Flexbox to ensure native tactile behavior on mobile.</li>
+                    <li><strong>Managing Intrinsic Load:</strong> Complex ideas (e.g. Supply Chain Resilience, Intermodal Transport, Cross-Docking) are reduced to highly relatable, single-step ECE trivia schemas.</li>
+                    <li><strong>Modality Effect:</strong> The Text-to-Speech (TTS) feature prevents working memory overload by offloading reading demands to the auditory channel.</li>
+                </ul>
+            </div>
+            <button id="btn-close-educator" class="game-btn bg-blue-500 hover:bg-blue-400 text-white font-black text-xl py-3 px-6 rounded-full border-4 border-white w-full text-center">Understood!</button>
+        </div>
+    </div>
+
+    <script>
+        const GameState = { unlockedLevel: 1, currentLevelObj: null, currentScreen: 'hub', currentQuestionIndex: 0 };
+
+        const SoundManager = {
+            isMusicPlaying: false, initialized: false, bgMusic: null, bgParts: [], uiSynth: null, fxSynth: null, errorSynth: null,
+            init() {
+                if(this.initialized) return;
+                
+                this.uiSynth = new Tone.Synth({ oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 }}).toDestination();
+                this.uiSynth.volume.value = -15;
+                this.fxSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: 1 }}).toDestination();
+                this.fxSynth.volume.value = -10;
+                this.errorSynth = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 2, oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 }}).toDestination();
+                this.errorSynth.volume.value = -10;
+                
+                this.bgMusic = new Tone.Synth({ oscillator: { type: "triangle" }, envelope: { attack: 0.02, decay: 0.1, sustain: 0.1, release: 0.5 }}).toDestination();
+                this.bgMusic.volume.value = -20;
+                
+                const melodies = [
+                    [{"time": "0:0:0", "note": "C4", "dur": "8n"}, {"time": "0:0:2", "note": "E4", "dur": "8n"}, {"time": "0:1:0", "note": "G4", "dur": "4n"}, {"time": "0:2:0", "note": "A4", "dur": "8n"}, {"time": "0:2:2", "note": "G4", "dur": "8n"}, {"time": "0:3:0", "note": "E4", "dur": "4n"}, {"time": "1:0:0", "note": "D4", "dur": "8n"}, {"time": "1:0:2", "note": "F4", "dur": "8n"}, {"time": "1:1:0", "note": "E4", "dur": "8n"}, {"time": "1:1:2", "note": "D4", "dur": "8n"}, {"time": "1:2:0", "note": "C4", "dur": "2n"}],
+                    [{"time": "0:0:0", "note": "C4", "dur": "4n"}, {"time": "0:1:0", "note": "E4", "dur": "4n"}, {"time": "0:2:0", "note": "G4", "dur": "2n"}, {"time": "1:0:0", "note": "A4", "dur": "4n"}, {"time": "1:1:0", "note": "F4", "dur": "4n"}, {"time": "1:2:0", "note": "C4", "dur": "2n"}],
+                    [{"time": "0:0:0", "note": "D4", "dur": "8n"}, {"time": "0:0:2", "note": "F4", "dur": "8n"}, {"time": "0:1:0", "note": "A4", "dur": "4n"}, {"time": "0:2:0", "note": "G4", "dur": "4n"}, {"time": "0:3:0", "note": "F4", "dur": "4n"}, {"time": "1:0:0", "note": "E4", "dur": "4n"}, {"time": "1:1:0", "note": "C4", "dur": "2n"}],
+                    [{"time": "0:0:0", "note": "C5", "dur": "8n"}, {"time": "0:0:2", "note": "G4", "dur": "8n"}, {"time": "0:1:0", "note": "E4", "dur": "8n"}, {"time": "0:1:2", "note": "C4", "dur": "8n"}, {"time": "0:2:0", "note": "D4", "dur": "4n"}, {"time": "0:3:0", "note": "G4", "dur": "4n"}, {"time": "1:0:0", "note": "C5", "dur": "2n"}]
+                ];
+
+                this.bgParts = melodies.map(mel => {
+                    const part = new Tone.Part((time, value) => {
+                        this.bgMusic.triggerAttackRelease(value.note, value.dur, time);
+                    }, mel);
+                    part.loop = true; part.loopEnd = "2m"; return part;
+                });
+
+                Tone.Transport.loop = true; Tone.Transport.loopEnd = "32m";
+                const bpms = [130, 90, 110, 140];
+                
+                this.bgParts[0].start("0m").stop("8m");
+                this.bgParts[1].start("8m").stop("16m");
+                this.bgParts[2].start("16m").stop("24m");
+                this.bgParts[3].start("24m").stop("32m");
+
+                Tone.Transport.schedule((time) => Tone.Transport.bpm.setValueAtTime(bpms[0], time), "0m");
+                Tone.Transport.schedule((time) => Tone.Transport.bpm.setValueAtTime(bpms[1], time), "8m");
+                Tone.Transport.schedule((time) => Tone.Transport.bpm.setValueAtTime(bpms[2], time), "16m");
+                Tone.Transport.schedule((time) => Tone.Transport.bpm.setValueAtTime(bpms[3], time), "24m");
+
+                this.initialized = true;
+            },
+            playClick() { if(this.isMusicPlaying) this.uiSynth.triggerAttackRelease("C6", "32n"); },
+            playSuccess() { 
+                if(this.isMusicPlaying) {
+                    const now = Tone.now();
+                    this.fxSynth.triggerAttackRelease(["C4", "E4"], "8n", now);
+                    this.fxSynth.triggerAttackRelease(["G4", "C5"], "8n", now + 0.15);
+                } 
+            },
+            playError() { if(this.isMusicPlaying) this.errorSynth.triggerAttackRelease("C2", "8n"); },
+            async toggleMusic() {
+                if(!this.initialized) { await Tone.start(); this.init(); }
+                const btn = document.getElementById('btn-music');
+                if (this.isMusicPlaying) { Tone.Transport.pause(); btn.classList.replace('bg-purple-500', 'bg-emerald-400'); this.isMusicPlaying = false; } 
+                else { Tone.Transport.start(); btn.classList.replace('bg-emerald-400', 'bg-purple-500'); this.isMusicPlaying = true; }
+            }
+        };
+
+        let femaleVoice = null;
+        function loadVoices() {
+            const voices = window.speechSynthesis.getVoices();
+            femaleVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Female') || v.name.includes('Samantha') || v.name.includes('Google UK English Female')));
+            if (!femaleVoice) femaleVoice = voices.find(v => v.lang.startsWith('en'));
+        }
+        window.speechSynthesis.onvoiceschanged = loadVoices; loadVoices();
+
+        const levelsData = [
+            { id: 1, title: "1. Supply Basics I", icon: "📦", subject: "Supply Chain", characterId: "svg-kekeno", questions: [
+                { instruction: "The whole journey of a toy from raw materials to you is the...", visualHTML: `<div class="text-8xl">📦</div>`, options: ["Supply Chain", "Toy Box", "Magic Carpet"], correctAnswer: "Supply Chain", successMsg: "Ka pai! The supply chain connects everything." },
+                { instruction: "Moving and storing boxes safely is called...", visualHTML: `<div class="text-8xl">🚚</div>`, options: ["Logistics", "Sleeping", "Dancing"], correctAnswer: "Logistics", successMsg: "Yes! Logistics gets things where they need to go." },
+                { instruction: "Buying the materials needed to make a new product is called...", visualHTML: `<div class="text-8xl">🛒</div>`, options: ["Procurement", "Eating", "Singing"], correctAnswer: "Procurement", successMsg: "Awesome! Procurement is buying what we need." },
+                { instruction: "The time you wait for a package to arrive is the...", visualHTML: `<div class="text-8xl">⏳</div>`, options: ["Lead Time", "Play Time", "Nap Time"], correctAnswer: "Lead Time", successMsg: "Great! Shorter lead times mean faster deliveries." },
+                { instruction: "Guessing what toys kids will want to buy next month is...", visualHTML: `<div class="text-8xl">🤔</div>`, options: ["Demand Planning", "Hide and Seek", "Tag"], correctAnswer: "Demand Planning", successMsg: "Perfect! Demand planning helps us get ready." }
+            ]},
+            { id: 2, title: "2. Supply Basics II", icon: "🏭", subject: "Supply Chain", characterId: "svg-kiwi", questions: [
+                { instruction: "Making toys out of wood and plastic in a factory is called...", visualHTML: `<div class="text-8xl">🏭</div>`, options: ["Manufacturing", "Breaking", "Throwing"], correctAnswer: "Manufacturing", successMsg: "Ka pai! Manufacturing turns materials into toys." },
+                { instruction: "Sending finished toys to all the stores in town is called...", visualHTML: `<div class="text-8xl">🏪</div>`, options: ["Distribution", "Painting", "Cooking"], correctAnswer: "Distribution", successMsg: "Yes! Distribution spreads toys everywhere." },
+                { instruction: "When you finally buy and play with a new toy, it's called...", visualHTML: `<div class="text-8xl">🧸</div>`, options: ["Consumption", "Cleaning", "Sleeping"], correctAnswer: "Consumption", successMsg: "Awesome! Consumption is the fun part." },
+                { instruction: "The whole life of a toy from new to recycled is its...", visualHTML: `<div class="text-8xl">♻️</div>`, options: ["Product Lifecycle", "Dream", "Vacation"], correctAnswer: "Product Lifecycle", successMsg: "Great! Everything has a product lifecycle." },
+                { instruction: "Making sure people are super happy with their delivery is...", visualHTML: `<div class="text-8xl">😊</div>`, options: ["Customer Satisfaction", "Customer Sadness", "Customer Anger"], correctAnswer: "Customer Satisfaction", successMsg: "Perfect! Happy customers are the best." }
+            ]},
+            { id: 3, title: "3. Warehouses I", icon: "🏢", subject: "Storage", characterId: "svg-huntaway", questions: [
+                { instruction: "Keeping track of everything inside a giant storage building is...", visualHTML: `<div class="text-8xl">🏢</div>`, options: ["Warehouse Management", "Forest Management", "Zoo Management"], correctAnswer: "Warehouse Management", successMsg: "Ka pai! Warehouses hold all the boxes." },
+                { instruction: "Making sure we have just the right amount of boxes is...", visualHTML: `<div class="text-8xl">📊</div>`, options: ["Inventory Control", "Animal Control", "Mind Control"], correctAnswer: "Inventory Control", successMsg: "Yes! Inventory control balances the stock." },
+                { instruction: "The basic stuff like wood and metal used to make things are...", visualHTML: `<div class="text-8xl">🪵</div>`, options: ["Raw Materials", "Finished Toys", "Magic Dust"], correctAnswer: "Raw Materials", successMsg: "Awesome! We build with raw materials." },
+                { instruction: "Toys that are only half-built on the factory floor are called...", visualHTML: `<div class="text-8xl">🔨</div>`, options: ["Work-in-Progress", "Broken Toys", "Lost Toys"], correctAnswer: "Work-in-Progress", successMsg: "Great! WIP means they are almost done." },
+                { instruction: "Toys that are all done and ready to sell are...", visualHTML: `<div class="text-8xl">🎁</div>`, options: ["Finished Goods", "Unfinished Goods", "Lost Goods"], correctAnswer: "Finished Goods", successMsg: "Perfect! Finished goods are ready for you." }
+            ]},
+            { id: 4, title: "4. Warehouses II", icon: "📋", subject: "Fulfillment", characterId: "svg-kea", questions: [
+                { instruction: "Getting your specific order picked, packed, and shipped is...", visualHTML: `<div class="text-8xl">✅</div>`, options: ["Order Fulfillment", "Order Forgetting", "Order Losing"], correctAnswer: "Order Fulfillment", successMsg: "Ka pai! Fulfillment gets your order done." },
+                { instruction: "The special barcode sticker on a box to track it is a...", visualHTML: `<div class="text-8xl">🏷️</div>`, options: ["SKU", "Moo", "Boo"], correctAnswer: "SKU", successMsg: "Yes! SKUs help us scan and track." },
+                { instruction: "Grabbing the right toy from the warehouse shelf is called...", visualHTML: `<div class="text-8xl">🖐️</div>`, options: ["Picking", "Kicking", "Licking"], correctAnswer: "Picking", successMsg: "Awesome! Picking is like a treasure hunt." },
+                { instruction: "Putting the toy safely inside a cardboard box is called...", visualHTML: `<div class="text-8xl">📦</div>`, options: ["Packing", "Whacking", "Quacking"], correctAnswer: "Packing", successMsg: "Great! Packing keeps the toy safe." },
+                { instruction: "Moving boxes directly from one truck to another without storing them is...", visualHTML: `<div class="text-8xl">🚛</div>`, options: ["Cross-Docking", "Cross-Walking", "Cross-Talking"], correctAnswer: "Cross-Docking", successMsg: "Perfect! Cross-docking is super fast." }
+            ]},
+            { id: 5, title: "5. Transport I", icon: "🚢", subject: "Movement", characterId: "svg-whio", questions: [
+                { instruction: "Heavy things carried by huge trucks, trains, or ships are...", visualHTML: `<div class="text-8xl">🚢</div>`, options: ["Freight", "Feathers", "Balloons"], correctAnswer: "Freight", successMsg: "Ka pai! Freight is heavy cargo." },
+                { instruction: "The final drive to drop the package at your front door is...", visualHTML: `<div class="text-8xl">🚪</div>`, options: ["Last-Mile Delivery", "First-Mile Delivery", "Middle-Mile Delivery"], correctAnswer: "Last-Mile Delivery", successMsg: "Yes! Last-mile comes right to your house." },
+                { instruction: "Taking good care of all the delivery trucks so they don't break down is...", visualHTML: `<div class="text-8xl">🚚</div>`, options: ["Fleet Management", "Pet Management", "Farm Management"], correctAnswer: "Fleet Management", successMsg: "Awesome! Fleet management keeps trucks running." },
+                { instruction: "Finding the fastest map path for the delivery driver is...", visualHTML: `<div class="text-8xl">🗺️</div>`, options: ["Routing", "Shouting", "Pouting"], correctAnswer: "Routing", successMsg: "Great! Routing saves time and gas." },
+                { instruction: "Using both a giant ship and a train for the exact same box is...", visualHTML: `<div class="text-8xl">🚆</div>`, options: ["Intermodal Transport", "Animal Transport", "Magic Transport"], correctAnswer: "Intermodal Transport", successMsg: "Perfect! Intermodal uses many vehicles." }
+            ]},
+            { id: 6, title: "6. Transport II", icon: "🗺️", subject: "Networks", characterId: "svg-tui", questions: [
+                { instruction: "The company you hire to drive the boxes around is the...", visualHTML: `<div class="text-8xl">👨‍✈️</div>`, options: ["Carrier", "Barrier", "Terrier"], correctAnswer: "Carrier", successMsg: "Ka pai! Carriers transport the goods." },
+                { instruction: "Packing the truck like a puzzle so everything fits perfectly is...", visualHTML: `<div class="text-8xl">🧩</div>`, options: ["Load Planning", "Party Planning", "Meal Planning"], correctAnswer: "Load Planning", successMsg: "Yes! Load planning saves so much space." },
+                { instruction: "Deciding exactly where to build the giant warehouses is...", visualHTML: `<div class="text-8xl">🏗️</div>`, options: ["Network Design", "Finger Painting", "Tree Climbing"], correctAnswer: "Network Design", successMsg: "Awesome! Network design connects everything." },
+                { instruction: "A special freezing truck to deliver ice cream safely is a...", visualHTML: `<div class="text-8xl">🍦</div>`, options: ["Cold Chain", "Hot Chain", "Warm Chain"], correctAnswer: "Cold Chain", successMsg: "Great! The cold chain keeps food fresh." },
+                { instruction: "Sending a broken toy backward to the store is...", visualHTML: `<div class="text-8xl">↩️</div>`, options: ["Reverse Logistics", "Forward Logistics", "Sideways Logistics"], correctAnswer: "Reverse Logistics", successMsg: "Perfect! Reverse logistics handles returns." }
+            ]},
+            { id: 7, title: "7. Global Trade I", icon: "🌍", subject: "Economics", characterId: "svg-ruru", questions: [
+                { instruction: "Moving boxes all over the entire world is called...", visualHTML: `<div class="text-8xl">🌍</div>`, options: ["Global Logistics", "Local Logistics", "Backyard Logistics"], correctAnswer: "Global Logistics", successMsg: "Ka pai! Global logistics spans the earth." },
+                { instruction: "Getting permission from the government to bring toys into a country is...", visualHTML: `<div class="text-8xl">🛂</div>`, options: ["Customs Clearance", "Hall Pass", "Recess"], correctAnswer: "Customs Clearance", successMsg: "Yes! Customs makes sure it is safe." },
+                { instruction: "A special tax paid to bring things in from far away is a...", visualHTML: `<div class="text-8xl">💰</div>`, options: ["Tariff", "Allowance", "Present"], correctAnswer: "Tariff", successMsg: "Awesome! Tariffs are import taxes." },
+                { instruction: "Rules that make it harder to send boxes to other countries are...", visualHTML: `<div class="text-8xl">🚧</div>`, options: ["Trade Barriers", "Trade Slides", "Trade Swings"], correctAnswer: "Trade Barriers", successMsg: "Great! Trade barriers slow things down." },
+                { instruction: "Being able to quickly buy toys from a different place if one is closed is...", visualHTML: `<div class="text-8xl">🤸</div>`, options: ["Sourcing Flexibility", "Sourcing Stubbornness", "Sourcing Sadness"], correctAnswer: "Sourcing Flexibility", successMsg: "Perfect! Flexibility keeps us moving." }
+            ]},
+            { id: 8, title: "8. Global Trade II", icon: "🤝", subject: "Economics", characterId: "svg-takahe", questions: [
+                { instruction: "Making things cheaper by making a whole bunch at once is...", visualHTML: `<div class="text-8xl">🏭</div>`, options: ["Economies of Scale", "Economies of Ants", "Economies of Mice"], correctAnswer: "Economies of Scale", successMsg: "Ka pai! Making more makes it cheaper." },
+                { instruction: "Bouncing back quickly when a big delivery gets delayed is...", visualHTML: `<div class="text-8xl">🦸</div>`, options: ["Supply Chain Resilience", "Crying", "Quitting"], correctAnswer: "Supply Chain Resilience", successMsg: "Yes! Resilience means staying strong." },
+                { instruction: "Building toys in a country closer to your home is called...", visualHTML: `<div class="text-8xl">🏠</div>`, options: ["Nearshoring", "Farshoring", "Moonshoring"], correctAnswer: "Nearshoring", successMsg: "Awesome! Nearshoring brings it closer." },
+                { instruction: "Following all the safety rules when moving big boxes is...", visualHTML: `<div class="text-8xl">📋</div>`, options: ["Compliance", "Defiance", "Silence"], correctAnswer: "Compliance", successMsg: "Great! Compliance keeps everyone safe." },
+                { instruction: "Searching the whole world for the best toy materials is...", visualHTML: `<div class="text-8xl">🔎</div>`, options: ["Global Sourcing", "Hiding", "Sleeping"], correctAnswer: "Global Sourcing", successMsg: "Perfect! Global sourcing finds the best stuff." }
+            ]},
+            { id: 9, title: "9. Strategy I", icon: "🧠", subject: "Optimization", characterId: "svg-kakapo", questions: [
+                { instruction: "Grouping people by how fast they want their packages is...", visualHTML: `<div class="text-8xl">👥</div>`, options: ["Customer Segmentation", "Customer Pushing", "Customer Hiding"], correctAnswer: "Customer Segmentation", successMsg: "Ka pai! Segmentation helps us plan." },
+                { instruction: "Getting materials exactly when you need them, not early, is...", visualHTML: `<div class="text-8xl">⏱️</div>`, options: ["Just-In-Time", "Way-Too-Late", "Too-Early"], correctAnswer: "Just-In-Time", successMsg: "Yes! Just-in-time saves storage space." },
+                { instruction: "Being able to see exactly where your package is on a map is...", visualHTML: `<div class="text-8xl">👀</div>`, options: ["Visibility", "Invisibility", "Blindness"], correctAnswer: "Visibility", successMsg: "Awesome! Visibility tracks the boxes." },
+                { instruction: "Using robots to carry boxes safely in the warehouse is...", visualHTML: `<div class="text-8xl">🤖</div>`, options: ["Automation", "Magic", "Sleeping"], correctAnswer: "Automation", successMsg: "Great! Automation speeds things up." },
+                { instruction: "Checking our speed to see if we are getting faster is...", visualHTML: `<div class="text-8xl">📈</div>`, options: ["Performance Measurement", "Forgetting", "Ignoring"], correctAnswer: "Performance Measurement", successMsg: "Perfect! We measure to improve." }
+            ]},
+            { id: 10, title: "10. Strategy II", icon: "🚀", subject: "Optimization", characterId: "svg-weka", questions: [
+                { instruction: "Checking how many orders we completely finished today is the...", visualHTML: `<div class="text-8xl">💯</div>`, options: ["Order Fill Rate", "Order Empty Rate", "Order Lost Rate"], correctAnswer: "Order Fill Rate", successMsg: "Ka pai! Order fill rate shows our success." },
+                { instruction: "Delivering to both big stores and straight to houses is...", visualHTML: `<div class="text-8xl">🏘️</div>`, options: ["Multi-Channel Logistics", "Single-Channel Logistics", "No-Channel Logistics"], correctAnswer: "Multi-Channel Logistics", successMsg: "Yes! Multi-channel serves everybody." },
+                { instruction: "Being good friends with the people who sell you materials is having good...", visualHTML: `<div class="text-8xl">🤝</div>`, options: ["Supplier Relationships", "Supplier Fights", "Supplier Enemies"], correctAnswer: "Supplier Relationships", successMsg: "Awesome! Good relationships are vital." },
+                { instruction: "Practicing delivery routes in a computer game first is a...", visualHTML: `<div class="text-8xl">💻</div>`, options: ["Logistics Simulation", "Reality", "Dream"], correctAnswer: "Logistics Simulation", successMsg: "Great! Simulations help us learn safely." },
+                { instruction: "Making sure every single truck is completely full and busy is...", visualHTML: `<div class="text-8xl">🚛</div>`, options: ["Asset Utilization", "Asset Wasting", "Asset Hiding"], correctAnswer: "Asset Utilization", successMsg: "Perfect! Asset utilization prevents waste." }
+            ]}
+        ];
+
+        function sanitizeForSpeech(text) {
+            let safeText = text;
+            const dictionary = {"Kia ora": "Hello", "Pīwakawaka": "Fantail bird", "Ka pai": "Good job", "Tino Pai Rawa Atu": "Excellent", "Kekeno": "New Zealand fur seal"};
+            for (const [maori, english] of Object.entries(dictionary)) {
+                safeText = safeText.replace(new RegExp(maori, "gi"), english);
+            }
+            return safeText;
+        }
+
+        function speak(text) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(sanitizeForSpeech(text));
+            if (femaleVoice) utterance.voice = femaleVoice;
+            utterance.rate = 0.9; utterance.pitch = 1.2;
+            
+            const box = document.getElementById('instruction-box');
+            if (box && GameState.currentScreen === 'level') {
+                utterance.onstart = () => box.classList.add('tts-active');
+                utterance.onend = () => box.classList.remove('tts-active');
+                utterance.onerror = () => box.classList.remove('tts-active');
+            }
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function burstTownConfetti(x, y) {
+            const symbols = ['📦', '🚚', '🚢', '🏭', '🗺️'];
+            for (let i = 0; i < 20; i++) {
+                let particle = document.createElement('div');
+                particle.innerText = symbols[Math.floor(Math.random() * symbols.length)];
+                particle.className = 'particle text-3xl';
+                particle.style.left = x + 'px';
+                particle.style.top = y + 'px';
+                
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = 80 + Math.random() * 120;
+                particle.style.setProperty('--tx', `calc(-50% + ${Math.cos(angle) * velocity}px)`);
+                particle.style.setProperty('--ty', `calc(-50% + ${Math.sin(angle) * velocity}px)`);
+                particle.style.setProperty('--rot', `${Math.random() * 360}deg`);
+                
+                document.body.appendChild(particle);
+                setTimeout(() => particle.remove(), 800);
+            }
+        }
+
+        function renderHub() {
+            const container = document.getElementById('map-nodes');
+            container.innerHTML = '';
+            levelsData.forEach((level) => {
+                const isLocked = level.id > GameState.unlockedLevel;
+                const btn = document.createElement('button');
+                btn.className = `game-btn p-4 sm:p-6 rounded-3xl border-4 border-white text-left flex items-center gap-4 ${isLocked ? 'bg-gray-200 level-locked text-gray-400' : 'bg-white hover:bg-emerald-50'}`;
+                btn.innerHTML = `<div class="text-4xl sm:text-5xl">${isLocked ? '🔒' : level.icon}</div><div><div class="font-black text-lg sm:text-xl text-gray-800">${level.title}</div><div class="text-sm font-bold ${isLocked ? 'text-gray-400' : 'text-emerald-500'}">${isLocked ? 'Locked' : level.subject}</div></div>`;
+                if (!isLocked) btn.onclick = () => loadLevel(level);
+                container.appendChild(btn);
+            });
+        }
+
+        function loadLevel(level, isNextQuestion = false) {
+            GameState.currentLevelObj = level;
+            GameState.currentScreen = 'level';
+            
+            if (!isNextQuestion) {
+                GameState.currentQuestionIndex = 0;
+                document.getElementById('screen-hub').classList.replace('slide-in-right', 'slide-out-left');
+                document.getElementById('screen-level').classList.replace('slide-out-right', 'slide-in-right');
+            }
+            
+            const currentQ = level.questions[GameState.currentQuestionIndex];
+            
+            const progressContainer = document.getElementById('level-progress');
+            progressContainer.innerHTML = '';
+            for (let i = 0; i < level.questions.length; i++) {
+                const star = document.createElement('span');
+                star.innerText = '⭐';
+                star.className = `text-sm sm:text-xl drop-shadow-sm ${i <= GameState.currentQuestionIndex ? 'star-filled' : 'star-empty'}`;
+                progressContainer.appendChild(star);
+            }
+            
+            document.getElementById('level-instruction').innerText = currentQ.instruction;
+            document.getElementById('level-visual').innerHTML = currentQ.visualHTML;
+            document.getElementById('level-character').innerHTML = document.getElementById(level.characterId).innerHTML;
+            document.getElementById('level-character').className = 'animate-float';
+
+            const optionsContainer = document.getElementById('level-options');
+            optionsContainer.innerHTML = '';
+            
+            const colors = ['bg-rose-100 border-rose-300 text-rose-800', 'bg-sky-100 border-sky-300 text-sky-800', 'bg-amber-100 border-amber-300 text-amber-800'];
+            currentQ.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `game-btn ${colors[idx % colors.length]} hover:brightness-95 font-black text-lg sm:text-3xl py-3 px-4 sm:py-4 sm:px-8 rounded-2xl border-4 min-w-[120px] w-full sm:w-auto`;
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(opt, level, btn);
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selected, level, btnElement) {
+            const currentQ = level.questions[GameState.currentQuestionIndex];
+            const allBtns = document.getElementById('level-options').querySelectorAll('button');
+            
+            if (selected === currentQ.correctAnswer) {
+                SoundManager.playSuccess();
+                allBtns.forEach(b => b.disabled = true);
+                
+                btnElement.className = "game-btn bg-emerald-300 border-emerald-500 text-emerald-900 font-black text-lg sm:text-3xl py-3 px-4 sm:py-4 sm:px-8 rounded-2xl border-4 min-w-[120px] w-full sm:w-auto scale-[1.02] sm:scale-110";
+                
+                const rect = btnElement.getBoundingClientRect();
+                burstTownConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                
+                document.getElementById('level-character').classList.replace('animate-float', 'animate-bounce-fast');
+                speak(currentQ.successMsg);
+
+                if (GameState.currentQuestionIndex < level.questions.length - 1) {
+                    setTimeout(() => {
+                        const loader = document.getElementById('loading-overlay');
+                        loader.classList.remove('hidden');
+                        loader.classList.add('pointer-events-auto');
+                        setTimeout(() => loader.classList.remove('opacity-0'), 10);
+                        
+                        setTimeout(() => {
+                            GameState.currentQuestionIndex++; 
+                            loadLevel(level, true);
+                            loader.classList.add('opacity-0');
+                            loader.classList.remove('pointer-events-auto');
+                            setTimeout(() => loader.classList.add('hidden'), 300);
+                        }, 1200); 
+                    }, 1200);
+                } else {
+                    setTimeout(() => {
+                        if(level.id === 10) {
+                            const modal = document.getElementById('modal-finale');
+                            modal.classList.remove('hidden'); 
+                            document.getElementById('finale-box').classList.remove('scale-90');
+                            speak("Tino Pai Rawa Atu!");
+                        } else {
+                            const modal = document.getElementById('modal-success');
+                            modal.classList.remove('hidden'); 
+                            document.getElementById('success-box').classList.remove('scale-90');
+                            speak("Ka pai! You are super smart!");
+                            if (GameState.unlockedLevel === level.id) GameState.unlockedLevel++;
+                        }
+                    }, 1000);
+                }
+            } else {
+                SoundManager.playError();
+                
+                const originalClass = btnElement.className;
+                btnElement.className = "game-btn bg-red-400 border-red-600 text-white font-black text-lg sm:text-3xl py-3 px-4 sm:py-4 sm:px-8 rounded-2xl border-4 min-w-[120px] w-full sm:w-auto";
+                setTimeout(() => btnElement.className = originalClass, 400);
+
+                const charEl = document.getElementById('level-character');
+                charEl.classList.remove('animate-float');
+                charEl.classList.add('error-shake');
+                setTimeout(() => { charEl.classList.remove('error-shake'); charEl.classList.add('animate-float'); }, 400);
+
+                speak("Not quite! Let's try again. " + currentQ.instruction);
+            }
+        }
+
+        window.onload = () => {
+            document.getElementById('btn-back')?.addEventListener('click', () => {
+                GameState.currentScreen = 'hub';
+                document.getElementById('screen-level').classList.replace('slide-in-right', 'slide-out-right');
+                document.getElementById('screen-hub').classList.replace('slide-out-left', 'slide-in-right');
+                window.speechSynthesis.cancel(); renderHub();
+            });
+            
+            document.getElementById('btn-next')?.addEventListener('click', () => {
+                document.getElementById('success-box').classList.add('scale-90');
+                setTimeout(() => document.getElementById('modal-success').classList.add('hidden'), 200);
+                document.getElementById('btn-back').click();
+            });
+
+            document.getElementById('btn-restart')?.addEventListener('click', () => {
+                document.getElementById('finale-box').classList.add('scale-90');
+                setTimeout(() => document.getElementById('modal-finale').classList.add('hidden'), 200);
+                GameState.unlockedLevel = 1;
+                document.getElementById('btn-back').click();
+            });
+            
+            document.getElementById('btn-speech')?.addEventListener('click', () => {
+                if (GameState.currentScreen === 'hub') speak(document.getElementById('hub-instruction').innerText);
+                else if (GameState.currentScreen === 'level') speak(GameState.currentLevelObj.questions[GameState.currentQuestionIndex].instruction);
+            });
+            
+            document.getElementById('btn-educator')?.addEventListener('click', () => {
+                document.getElementById('modal-educator').classList.remove('hidden');
+                setTimeout(() => document.getElementById('educator-box').classList.remove('scale-90'), 10);
+            });
+            
+            document.getElementById('btn-close-educator')?.addEventListener('click', () => {
+                document.getElementById('educator-box').classList.add('scale-90');
+                setTimeout(() => document.getElementById('modal-educator').classList.add('hidden'), 200);
+            });
+            
+            document.getElementById('btn-music')?.addEventListener('click', () => SoundManager.toggleMusic());
+            document.body.addEventListener('click', (e) => { if (e.target.closest('.game-btn') && e.target.id !== 'btn-music') SoundManager.playClick(); });
+            
+            renderHub();
+        };
+    </script>
+</body>
+</html>
